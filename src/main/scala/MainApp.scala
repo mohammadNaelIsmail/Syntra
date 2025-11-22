@@ -10,7 +10,7 @@ object MainApp {
       .appName("LinkedIn Pipeline Skeleton")
       .master("local[*]")
       .getOrCreate()
-
+//testing
     val rawDF = LinkedInIngestion.getProfiles(spark)
     val cleanedDF = ProfileCleaner.clean(rawDF)
     val analyzedDF = SkillAnalyzer.analyze(cleanedDF)
