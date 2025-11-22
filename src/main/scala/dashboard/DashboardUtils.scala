@@ -1,0 +1,5 @@
+package dashboard
+
+object DashboardUtils {
+
+}
