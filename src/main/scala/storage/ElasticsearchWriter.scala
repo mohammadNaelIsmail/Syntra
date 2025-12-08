@@ -2,7 +2,6 @@ package storage
 
 import org.apache.spark.sql.DataFrame
 import org.elasticsearch.spark.sql._
-import org.apache.spark.sql.SparkSession
 
 object ElasticsearchWriter {
 
@@ -10,15 +9,11 @@ object ElasticsearchWriter {
     val esOptions = Map(
       "es.nodes" -> "localhost",
       "es.port" -> "9200",
-      "es.net.ssl" -> "true",
-      "es.net.ssl.cert.allow.self.signed" -> "true",
       "es.net.http.auth.user" -> "elastic",
-      "es.net.http.auth.pass" -> "1=UgWUJYXrYnBIziNxWl",
-      "es.mapping.id" -> "id"
+      "es.net.http.auth.pass" -> "15u7bMLAf=srLFvjJCeg"
     )
 
-    df.show(false)
-    df.saveToEs(s"$index/_doc", esOptions)
+    df.saveToEs(s"$index", esOptions)
     println(s"Data successfully written to Elasticsearch index: $index")
   }
 }
