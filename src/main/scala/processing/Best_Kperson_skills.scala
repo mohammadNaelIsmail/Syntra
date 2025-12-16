@@ -6,6 +6,7 @@ import org.apache.spark.sql.expressions.Window
 
 object Best_Kperson_skills {
 
+
   // 1️⃣ آخر تحديث لكل شخص + عدد المهارات
   def getLatestPersonStateWithSkillsCount(df: DataFrame): DataFrame = {
 

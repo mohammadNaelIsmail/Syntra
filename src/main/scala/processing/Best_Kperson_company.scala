@@ -6,6 +6,7 @@ import org.apache.spark.sql.expressions.Window
 
 object Best_Kperson_company {
 
+
   // 🔹 آخر تحديث لكل شخص
   private def getLatestPersonState(df: DataFrame): DataFrame = {
 

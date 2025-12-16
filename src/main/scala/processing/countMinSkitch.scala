@@ -77,6 +77,7 @@ object countMinSkitch {
       col("companies").as("c_b")
     )
 
+
     a.crossJoin(b)
       .filter(col("id_a") < col("id_b"))
       .withColumn(
