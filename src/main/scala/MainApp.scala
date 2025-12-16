@@ -6,7 +6,7 @@ import storage.OpenSearchWriter
 import processing.Best_Kperson_skills
 import processing.Best_Kperson_company
 import processing.localitySensitiveHashing
-
+import ingestion.LinkedInIngestion
 object MainApp {
   def main(args: Array[String]): Unit = {
     Configurator.setRootLevel(Level.OFF)
@@ -16,9 +16,16 @@ object MainApp {
       .master("local[*]")
       .getOrCreate()
 
-    val df = spark.read.option("multiline", "true").json("src/main/resources/people_1000_development.json")
-    val resultDF = localitySensitiveHashing.similarCareerPathsLSH_Local(df)
-    resultDF.show(10, truncate = false)
+val rawDF = LinkedInIngestion.getProfiles(spark,"test")
+
+    rawDF
+      .writeStream
+      .format("console")
+      .option("truncate", false)
+      .start()
+      .awaitTermination()
+    val parsedD = LinkedInIngestion.parseProfiles(rawDF)
+    val exeplodedDF=LinkedInIngestion.explodeCompanies(parsedD)
 
 
 
