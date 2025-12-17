@@ -12,7 +12,7 @@ object MainApp {
       .master("local[*]")
       .getOrCreate()
 
-    val df = spark.read.option("multiline", "true").json("src/main/resources/people_1000_development.json")
+    val df = spark.read.json("src/main/resources/people_1000_development.json")
 
     OpenSearchWriter.write(df, "people")
   }
