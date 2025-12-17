@@ -60,7 +60,6 @@ object ElasticsearchWriter {
     mergedDF
   }
 
-
   def writeStream(df: DataFrame, index: String = "people_snapshot"): StreamingQuery = {
     df.writeStream
       .foreachBatch { (batchDF: DataFrame, batchId: Long) =>
@@ -70,9 +69,9 @@ object ElasticsearchWriter {
         mergedDF.show(false)
 
         mergedDF.write
-          .format("org.elasticsearch.spark.sql")
+          .format("org.elasticsearch.spark.sql") 
           .options(esOptions)
-          .option("es.resource", index) // <-- هنا بدون /_doc
+          .option("es.resource", s"$index/_doc")
           .option("es.mapping.id", "person_id")
           .option("es.write.operation", "upsert")
           .mode("append")
@@ -84,5 +83,4 @@ object ElasticsearchWriter {
       .trigger(Trigger.ProcessingTime("5 seconds"))
       .start()
   }
-
 }
