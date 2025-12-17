@@ -6,32 +6,30 @@ import org.apache.spark.sql.types._
 
 object LinkedInIngestion {
 
-  def getProfiles(spark: SparkSession , topic: String = "test" ): DataFrame = {
-    val kafkaDF: DataFrame = spark.readStream
+  def getProfiles(spark: SparkSession, topic: String = "test"): DataFrame = {
+    val kafkaDF = spark.readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe",topic)
+      .option("subscribe", topic)
       .load()
       .selectExpr("CAST(value AS STRING) as json_str")
 
     kafkaDF
   }
+
   val schema = new StructType()
-    .add("id", StringType, true)
-    .add("name", StringType, true)
-    .add("skills_before", ArrayType(StringType), true)
-    .add("skills_after", ArrayType(StringType), true)
-    .add("new_skill", StringType, true)
-    .add("date", DateType, true)
+    .add("id", StringType)
+    .add("name", StringType)
+    .add("skills_before", ArrayType(StringType))
+    .add("skills_after", ArrayType(StringType))
+    .add("new_skill", StringType)
+    .add("date", StringType)
     .add("companies", ArrayType(
       new StructType()
-        .add("company_name", StringType, true)
-        .add("date_from", DateType, true)
-        .add("date_to", DateType, true)
-             ), true)
-    .add("profile_text",StringType)
-    .add("current_status",StringType)
-    .add("last_update",DateType)
+        .add("company_name", StringType)
+        .add("date_from", StringType)
+        .add("date_to", StringType)
+    ))
 
   def parseProfiles(df: DataFrame): DataFrame = {
     df.select(from_json(col("json_str"), schema).as("data"))
@@ -50,12 +48,7 @@ object LinkedInIngestion {
         $"date",
         $"company.company_name",
         $"company.date_from",
-        $"company.date_to",
-        $"profile_text",
-        $"current_status",
-        $"last_update"
+        $"company.date_to"
       )
   }
-
 }
-
