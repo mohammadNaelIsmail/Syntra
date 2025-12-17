@@ -1,3 +1,6 @@
+bin/zookeeper-server-start.sh config/zookeeper.properties
+bin/kafka-server-start.sh config/server.properties
+./kafka-topics.sh --bootstrap-server localhost:9092 --create --topic test --partitions 1 --replication-factor 1
 ahmad coments 
 ## 🚀 Running Apache Kafka (Windows) ahmad
 

@@ -1,8 +1,8 @@
 import org.apache.spark.sql.SparkSession
 import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
-import storage.OpenSearchWriter
-
+import storage.ElasticsearchWriter
+import ingestion.LinkedInIngestion
 object MainApp {
   def main(args: Array[String]): Unit = {
     Configurator.setRootLevel(Level.OFF)
@@ -11,9 +11,9 @@ object MainApp {
       .appName("MainApp")
       .master("local[*]")
       .getOrCreate()
-
-    val df = spark.read.json("src/main/resources/people_1000_development.json")
-
-    OpenSearchWriter.write(df, "people")
+    val rawDF = LinkedInIngestion.getProfiles(spark,"test")
+    val parsedDF = LinkedInIngestion.parseProfiles(rawDF)
+    val explodedDF = LinkedInIngestion.explodeCompanies(parsedDF)
+    ElasticsearchWriter.writeStream(explodedDF,"people_snapshot")
   }
 }
