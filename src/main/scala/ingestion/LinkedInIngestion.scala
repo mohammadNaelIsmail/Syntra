@@ -24,22 +24,30 @@ object LinkedInIngestion {
     .add("skills_after", ArrayType(StringType))
     .add("new_skill", StringType)
     .add("date", StringType)
-    .add("companies", ArrayType(
-      new StructType()
-        .add("company_name", StringType)
-        .add("date_from", StringType)
-        .add("date_to", StringType)
-    ))
+    .add("last_update", StringType)
+    .add("profile_text", StringType)
+    .add("current_status", StringType)
+    .add(
+      "companies",
+      ArrayType(
+        new StructType()
+          .add("company_name", StringType)
+          .add("date_from", StringType)
+          .add("date_to", StringType)
+      )
+    )
 
   def parseProfiles(df: DataFrame): DataFrame = {
     df.select(from_json(col("json_str"), schema).as("data"))
       .select(
-        col("data.id").as("person_id"),
+        col("data.person_id"),
         col("data.name"),
+        col("data.profile_text"),
+        col("data.current_status"),
         col("data.skills_before"),
         col("data.skills_after"),
         col("data.new_skill"),
-        to_date(col("data.date"), "yyyy-MM-dd").as("last_update"), // تحويل التاريخ
+        to_date(col("data.last_update"), "yyyy-MM-dd").as("last_update"),
         col("data.companies")
       )
   }
@@ -51,11 +59,13 @@ object LinkedInIngestion {
       .select(
         $"person_id",
         $"name",
+        $"profile_text",
+        $"current_status",
         $"skills_before",
         $"skills_after",
         $"new_skill",
         $"last_update",
-        $"company.company_name",
+        $"company.company_name".as("company_name"),
         $"company.date_from",
         $"company.date_to"
       )

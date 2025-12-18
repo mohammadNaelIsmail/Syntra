@@ -78,20 +78,22 @@ object ElasticsearchWriter {
     df.writeStream
       .foreachBatch { (batchDF: DataFrame, batchId: Long) =>
 
-        val mergedDF = mergePersonData(batchDF)
+        val mergedDF =
+          mergePersonData(batchDF)
+            .dropDuplicates("person_id")   // ⭐ الحل النهائي
 
         mergedDF.show(false)
 
         mergedDF.write
-          .format("org.elasticsearch.spark.sql") 
+          .format("org.elasticsearch.spark.sql")
           .options(esOptions)
-          .option("es.resource", s"$index/_doc")
+          .option("es.resource", index)
           .option("es.mapping.id", "person_id")
-          .option("es.write.operation", "upsert")
+          .option("es.write.operation", "index") // بدون conflicts
           .mode("append")
           .save()
 
-        println(s"Batch $batchId upserted into Elasticsearch index [$index].")
+        println(s"Batch $batchId written to Elasticsearch index [$index]")
       }
       .option("checkpointLocation", "/tmp/checkpoint/people_snapshot")
       .trigger(Trigger.ProcessingTime("5 seconds"))

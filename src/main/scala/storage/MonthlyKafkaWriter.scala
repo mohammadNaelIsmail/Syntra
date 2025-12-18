@@ -5,18 +5,19 @@ import org.apache.spark.sql.functions._
 
 object MonthlyKafkaWriter {
 
-  def write(df: DataFrame): Unit = {
-    val dfWithMonth = df.withColumn("month", date_format(col("last_update"), "yyyy-MM"))
+  def writeBatch(df: DataFrame): Unit = {
+    val dfWithMonth =
+      df.withColumn("month", date_format(col("last_update"), "yyyy-MM"))
 
-    dfWithMonth.selectExpr(
+    dfWithMonth
+      .selectExpr(
         "CAST(person_id AS STRING) AS key",
         "to_json(struct(*)) AS value"
       )
-      .writeStream
+      .write
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
       .option("topic", "linkedin_monthly_raw")
-      .option("checkpointLocation", "/tmp/kafka_monthly_checkpoint")
-      .start()
+      .save()
   }
 }

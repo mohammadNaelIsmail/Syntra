@@ -6,6 +6,7 @@ import org.apache.spark.sql.functions._
 object KafkaMonthlyReader {
 
   def read(spark: SparkSession, month: Option[String] = None): DataFrame = {
+
     val kafkaDF = spark.read
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
@@ -16,11 +17,15 @@ object KafkaMonthlyReader {
       .select(from_json(col("json_str"), LinkedInIngestion.schema).as("data"))
       .select("data.*")
       .withColumn("month", date_format(col("last_update"), "yyyy-MM"))
-
+    import spark.implicits._
     month match {
-      case Some(m) => kafkaDF.filter(col("month") === m)
+      case Some(m) =>
+        kafkaDF.filter(col("month") === m)
+
       case None =>
-        val latestMonth = kafkaDF.select(max("month")).as[String].first()
+        val latestMonth =
+          kafkaDF.select(max("month")).as[String].head()
+
         kafkaDF.filter(col("month") === latestMonth)
     }
   }
