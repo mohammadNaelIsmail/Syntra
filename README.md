@@ -18,3 +18,24 @@ cd C:\kafka\kafka_2.13-3.7.2\bin\windows
 
 .\kafka-console-producer.bat --topic test --bootstrap-server localhost:9092
 
+curl -X PUT "http://localhost:9200/people_snapshot" -H 'Content-Type: application/json' -d'
+{
+  "mappings": {
+    "properties": {
+      "person_id": { "type": "keyword" },
+      "name": { "type": "text" },
+      "skills_before_list": { "type": "keyword" },
+      "skills_after_list": { "type": "keyword" },
+      "experiences": {
+        "type": "nested",
+        "properties": {
+          "company_name": { "type": "keyword" },
+          "date_from": { "type": "date" },
+          "date_to": { "type": "date" }
+        }
+      },
+      "last_update": { "type": "date" }
+    }
+  }
+}
+'

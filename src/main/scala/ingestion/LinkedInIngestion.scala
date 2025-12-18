@@ -18,7 +18,7 @@ object LinkedInIngestion {
   }
 
   val schema = new StructType()
-    .add("id", StringType)
+    .add("person_id", StringType)
     .add("name", StringType)
     .add("skills_before", ArrayType(StringType))
     .add("skills_after", ArrayType(StringType))
@@ -33,19 +33,28 @@ object LinkedInIngestion {
 
   def parseProfiles(df: DataFrame): DataFrame = {
     df.select(from_json(col("json_str"), schema).as("data"))
-      .select("data.*")
+      .select(
+        col("data.id").as("person_id"),
+        col("data.name"),
+        col("data.skills_before"),
+        col("data.skills_after"),
+        col("data.new_skill"),
+        to_date(col("data.date"), "yyyy-MM-dd").as("last_update"), // تحويل التاريخ
+        col("data.companies")
+      )
   }
+
 
   def explodeCompanies(df: DataFrame): DataFrame = {
     import df.sparkSession.implicits._
     df.withColumn("company", explode_outer($"companies"))
       .select(
-        $"id",
+        $"person_id",
         $"name",
         $"skills_before",
         $"skills_after",
         $"new_skill",
-        $"date",
+        $"last_update",
         $"company.company_name",
         $"company.date_from",
         $"company.date_to"

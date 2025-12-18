@@ -59,7 +59,21 @@ object ElasticsearchWriter {
 
     mergedDF
   }
+  def writeBatch(
+                  df: DataFrame,
+                  index: String,
+                  idCol: String
+                ): Unit = {
 
+    df.write
+      .format("org.elasticsearch.spark.sql")
+      .options(esOptions)
+      .option("es.resource", s"$index")
+      .option("es.mapping.id", idCol)
+      .option("es.write.operation", "upsert")
+      .mode("append")
+      .save()
+  }
   def writeStream(df: DataFrame, index: String = "people_snapshot"): StreamingQuery = {
     df.writeStream
       .foreachBatch { (batchDF: DataFrame, batchId: Long) =>
