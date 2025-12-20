@@ -47,7 +47,7 @@ object ProcessDataReader {
           ElasticsearchProcessDataWriter.write(jsonopject)
         }
       }
-      .option("checkpointLocation", "C:/tmp/checkpoints/people_stream")
+      //.option("checkpointLocation", "C:/tmp/checkpoints/people_stream")
       .start()
 
     query.awaitTermination()
