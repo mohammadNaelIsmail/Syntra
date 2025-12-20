@@ -12,7 +12,7 @@ object Best_Kperson_skills {
 
     val windowSpec = Window
       .partitionBy("person_id")
-      .orderBy(col("date").desc)
+      .orderBy(col("last_update").desc)
 
     df
       .withColumn("rn", row_number().over(windowSpec))
@@ -26,11 +26,11 @@ object Best_Kperson_skills {
   }
 
   // 2️⃣ ترتيب الجميع وأخذ أعلى K
-  def getTopKBySkills(df: DataFrame, k: Int): DataFrame = {
+  def getBestPersonInMonthBySkills(df: DataFrame): DataFrame = {
 
     getLatestPersonStateWithSkillsCount(df)
       .orderBy(desc("skills_count"))   // ✅ ترتيب كل الأشخاص
-      .limit(k)                        // ✅ أخذ أول K
+      .limit(1)                        // ✅ أخذ أول K
   }
 }
 //الاستدعاء

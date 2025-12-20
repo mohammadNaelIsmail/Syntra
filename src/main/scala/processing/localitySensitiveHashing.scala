@@ -1,33 +1,23 @@
 package processing
 
-import org.apache.spark.ml.feature.{MinHashLSH , HashingTF}
-import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.DataFrame
-import scala.io.StdIn
-
-
-
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.ml.feature.MinHashLSH
+import org.apache.spark.ml.linalg.Vectors
 
 object localitySensitiveHashing {
 
-  //similar by skills
-//  val result =
-//    localitySensitiveHashing.similarToOnePersonLSHBySkiils(df, 0.5)
-//
-//  result.show(5,false)
+  // =========================
+  // فنكشن: يرجع لكل شخص أكثر شخص يشابهه
+  // =========================
 
-  def similarToOnePersonLSHBySkiils(
-                             df: DataFrame,
-                             threshold: Double = 0.5
-                           ): DataFrame = {
-    print("Enter person ID: ")
-     val    targetPersonId = StdIn.readLine()
+  def SimilarPersonBySkills(df: DataFrame): DataFrame = {
 
+    // 1) آخر حالة لكل شخص
     val windowSpec = Window
       .partitionBy("person_id")
-      .orderBy(col("date").desc)
+      .orderBy(col("last_update").desc)
 
     val latestDF = df
       .withColumn("rn", row_number().over(windowSpec))
@@ -35,22 +25,21 @@ object localitySensitiveHashing {
       .drop("rn")
       .filter(col("skills_after").isNotNull)
 
+    // 2) تجهيز الميزات (skills → vector)
     val skillsDF = latestDF
       .select("person_id", "skills_after")
       .withColumn(
         "features",
-        expr("transform(skills_after, x -> hash(x))")
+        array_distinct(expr("transform(skills_after, x -> hash(x))"))
       )
       .withColumn(
         "features",
-        array_distinct(col("features"))
-      )
-      .withColumn(
-        "features",
-        udf((xs: Seq[Int]) => Vectors.dense(xs.map(_.toDouble).toArray))
-          .apply(col("features"))
+        udf((xs: Seq[Int]) =>
+          Vectors.dense(xs.map(_.toDouble).toArray)
+        ).apply(col("features"))
       )
 
+    // 3) تدريب LSH
     val lsh = new MinHashLSH()
       .setInputCol("features")
       .setOutputCol("hashes")
@@ -58,91 +47,122 @@ object localitySensitiveHashing {
 
     val model = lsh.fit(skillsDF)
 
-    val targetVector = skillsDF
-      .filter(col("person_id") === targetPersonId)
-
-
-    model
+    // 4) تشابه الجميع مع الجميع
+    val simDF = model
       .approxSimilarityJoin(
-        targetVector,
         skillsDF,
-        1.0 - threshold,   // distance = 1 - similarity
+        skillsDF,
+        1.0,          // مسافة كبيرة للسماح بكل المقارنات
         "distance"
       )
-      .filter(col("datasetB.person_id") =!= targetPersonId)
-      .select(
-        col("datasetA.person_id").as("id_target"),
-        col("datasetB.person_id").as("id_other"),
-        (lit(1.0) - col("distance")).as("approx_jaccard")
-      )
-      .orderBy(desc("approx_jaccard"))
-  }
+      .filter(col("datasetA.person_id") =!= col("datasetB.person_id"))
+      .withColumn("approx_jaccard", lit(1.0) - col("distance"))
 
+    // 5) اختيار أكثر شخص مشابه لكل شخص
+    val rankWindow = Window
+      .partitionBy(col("datasetA.person_id"))
+      .orderBy(col("approx_jaccard").desc)
 
-
-  def similarCareerPathsLSH_Local(
-                                   df: DataFrame,
-                                 ): DataFrame = {
-
-    val spark = df.sparkSession
-
-    print("Enter person ID: ")
-    val    targetPersonId = StdIn.readLine()
-
-    val windowSpec = Window
-      .partitionBy("person_id")
-      .orderBy(col("date").desc)
-
-    val latestDF = df
-      .withColumn("rn", row_number().over(windowSpec))
+    simDF
+      .withColumn("rn", row_number().over(rankWindow))
       .filter(col("rn") === 1)
-      .drop("rn")
-
-    val companiesDF = latestDF
-      .withColumn("company", explode(col("companies.company_name")))
-      .groupBy("person_id")
-      .agg(collect_set("company").as("companies"))
-
-    val hashingTF = new HashingTF()
-      .setInputCol("companies")
-      .setOutputCol("features")
-      .setNumFeatures(1000)
-
-    val featurizedDF = hashingTF.transform(companiesDF)
-
-
-    val minHashLSH = new MinHashLSH()
-      .setInputCol("features")
-      .setOutputCol("hashes")
-      .setNumHashTables(5)
-
-    val lshModel = minHashLSH.fit(featurizedDF)
-
-
-    val targetDF = featurizedDF
-      .filter(col("person_id") === targetPersonId)
-
-    val othersDF = featurizedDF
-      .filter(col("person_id") =!= targetPersonId)
-
-
-    val similarDF = lshModel
-      .approxSimilarityJoin(
-        targetDF,
-        othersDF,
-        1.0,                     // max Jaccard distance
-        "jaccard_distance"
-      )
       .select(
-        col("datasetB.person_id").as("other_person_id"),
-        (lit(1.0) - col("jaccard_distance")).as("similarity")
+        col("datasetA.person_id").as("person"),
+        col("datasetB.person_id").as("most_similar_person")
       )
-      .orderBy(desc("similarity"))
-
-    similarDF
   }
 
 
 
+    // =====================================================
+    // ترجع لكل شخص أكثر شخص يشابهه حسب الشركات (LSH)
+    // =====================================================
+    def SimilarPersonByCompanies(df: DataFrame): DataFrame = {
+
+      // 1) آخر حالة لكل شخص
+      val windowSpec = Window
+        .partitionBy("person_id")
+        .orderBy(col("last_update").desc)
+
+      val latestDF = df
+        .withColumn("rn", row_number().over(windowSpec))
+        .filter(col("rn") === 1)
+        .drop("rn")
+        .filter(col("companies").isNotNull)
+
+      // 2) استخراج أسماء الشركات فقط
+      val companiesDF = latestDF
+        .select(
+          col("person_id"),
+          expr("transform(companies, c -> c.company_name)").as("company_names")
+        )
+        .filter(size(col("company_names")) > 0)
+
+      // 3) تجهيز الميزات (companies → vector)
+      val featuresDF = companiesDF
+        .withColumn(
+          "features_raw",
+          array_distinct(expr("transform(company_names, x -> hash(x))"))
+        )
+        .withColumn(
+          "features",
+          udf((xs: Seq[Int]) =>
+            Vectors.dense(xs.map(_.toDouble).toArray)
+          ).apply(col("features_raw"))
+        )
+        .drop("features_raw")
+
+      // 4) تدريب MinHash LSH
+      val lsh = new MinHashLSH()
+        .setInputCol("features")
+        .setOutputCol("hashes")
+        .setNumHashTables(5)
+
+      val model = lsh.fit(featuresDF)
+
+      // 5) تشابه الجميع مع الجميع (LSH)
+      val simDF = model
+        .approxSimilarityJoin(
+          featuresDF,
+          featuresDF,
+          1.0,
+          "distance"
+        )
+        .filter(col("datasetA.person_id") =!= col("datasetB.person_id"))
+        .withColumn("similarity", lit(1.0) - col("distance"))
+
+      // 6) اختيار أكثر شخص مشابه لكل شخص
+      val rankWindow = Window
+        .partitionBy(col("datasetA.person_id"))
+        .orderBy(col("similarity").desc)
+
+      simDF
+        .withColumn("rn", row_number().over(rankWindow))
+        .filter(col("rn") === 1)
+        .select(
+          col("datasetA.person_id").as("person"),
+          col("datasetB.person_id").as("most_similar_person")
+        )
+    }
+
+    // =====================================================
+    // MAIN
+    // =====================================================
+
+
+
+//الاستدعاء
+//  على شكل df [personid|similar]
+//    val resultDF = localitySensitiveHashing.SimilarPersonBySkills(df)
+//    val resultDFcomp = localitySensitiveHashing.mostSimilarPersonByCompanies(df)
+//    resultDF.show(false)
+//    resultDFcomp.show(false)
 
 }
+
+//{key"skillspeoplecount,value[{skill1,val1}]
+//{key"companypeoplecount,value[{company1,val1}]}
+//{key"semelaritybycompany",value[{p0,p1},{p1,p2}] }
+//{key"semelaritybyskills[{p0,p1},{p1,p2}]
+//{key"bestpersoninmonthbyskills,value"person"}
+//{key"bestpersoninmonthbycompany{value"person0"}
