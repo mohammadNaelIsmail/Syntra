@@ -7,7 +7,7 @@ import org.apache.spark.sql.expressions.Window
 object Best_Kperson_skills {
 
 
-  // 1️⃣ آخر تحديث لكل شخص + عدد المهارات
+
   def getLatestPersonStateWithSkillsCount(df: DataFrame): DataFrame = {
 
     val windowSpec = Window
@@ -25,12 +25,12 @@ object Best_Kperson_skills {
       )
   }
 
-  // 2️⃣ ترتيب الجميع وأخذ أعلى K
+
   def getBestPersonInMonthBySkills(df: DataFrame): DataFrame = {
 
     getLatestPersonStateWithSkillsCount(df)
-      .orderBy(desc("skills_count"))   // ✅ ترتيب كل الأشخاص
-      .limit(1)                        // ✅ أخذ أول K
+      .orderBy(desc("skills_count"))
+      .limit(1)
   }
 }
 //الاستدعاء

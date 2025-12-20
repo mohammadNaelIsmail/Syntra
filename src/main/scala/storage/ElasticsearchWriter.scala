@@ -80,7 +80,7 @@ object ElasticsearchWriter {
 
         val mergedDF =
           mergePersonData(batchDF)
-            .dropDuplicates("person_id")   // ⭐ الحل النهائي
+            .dropDuplicates("person_id")
 
         mergedDF.show(false)
 
@@ -89,7 +89,7 @@ object ElasticsearchWriter {
           .options(esOptions)
           .option("es.resource", index)
           .option("es.mapping.id", "person_id")
-          .option("es.write.operation", "index") // بدون conflicts
+          .option("es.write.operation", "index")
           .mode("append")
           .save()
 

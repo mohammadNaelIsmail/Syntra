@@ -46,14 +46,3 @@ object MonthlyKafkaWriter {
       .start()
   }
 }
-
-//
-//val query =
-//  MonthlyKafkaWriter.writeStreamByMonth(
-//    df = parsedDF,
-//    bootstrapServers = "localhost:9092",
-//    dateCol = "last_update",
-//    topicPrefix = "people"
-//  )
-//
-//query.awaitTermination()

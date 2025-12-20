@@ -52,9 +52,7 @@ object ProcessDataReader {
 
     query.awaitTermination()
   }
-  // =========================
-  // Schema للـ JSON
-  // =========================
+
   private val peopleSchema: StructType = StructType(Array(
     StructField("person_id", StringType),
     StructField("name", StringType),
