@@ -1,21 +1,35 @@
-# التغييرات — تبسيط Pipeline
+# Pipeline Refactor — Simplified Streaming Architecture
 
-## ما تم حذفه
-| الملف | السبب |
-|---|---|
-| `MainForMonthDataProcess.scala` | نقطة دخول ثانية لم تعد ضرورية |
-| `storage/MonthlyKafkaWriter.scala` | كان يكتب لـ Kafka ليُقرأ مرة ثانية — مرحلة وسيطة بلا قيمة |
-| `ingestion/ProcessDataReader.scala` | كان يقرأ من Kafka الشهري — يُغني عنه foreachBatch مباشرة |
+Removed Components:
+- MainForMonthDataProcess.scala: duplicate entry point
+- MonthlyKafkaWriter.scala: unnecessary intermediate Kafka layer
+- ProcessDataReader.scala: replaced by direct foreachBatch processing
 
-## ما تغيّر
-- `MainForStreamData.scala`: يشغّل stream واحد يكتب إلى ES مباشرة **ويحسب التحليلات الشهرية** في نفس الـ foreachBatch
-- `build.sbt`: حُذف `spray-json` (كان ungrouped import غير مستخدم)
+Architecture:
 
-## النتيجة
-```
-قبل: JSON → Kafka(test) → Spark1 → Kafka(people-YYYY-MM) → Spark2 → ES
-بعد: JSON → Kafka(linkedin-profiles) → Spark → ES
-```
-- عدد الملفات: 13 → 10
-- عدد الـ Kafka topics الشهرية: N topics → 0
-- عدد الـ Spark jobs: 2 → 1
+Before:
+JSON → Kafka(raw) → Spark Job 1 → Kafka(monthly) → Spark Job 2 → Elasticsearch
+
+After:
+JSON → Kafka(raw) → Spark Streaming → Elasticsearch
+└── analytics computed inside foreachBatch
+
+Changes:
+- Spark jobs: 2 → 1
+- Removed intermediate Kafka topic layer
+- Analytics merged into streaming job
+
+Impact:
+- Lower complexity
+- Fewer moving parts
+- Simpler execution model
+
+Trade-offs:
+- Less modular separation
+- Reduced replay of intermediate states
+- More logic inside single pipeline
+
+Result:
+- Faster pipeline
+- Easier development and testing
+- Cleaner architecture
