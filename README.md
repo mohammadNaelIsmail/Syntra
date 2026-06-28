@@ -1,76 +1,28 @@
-# LinkHarvester
+# Syntra — Production-Ready Fixes (Critical Architecture Gaps)
 
-## تشغيل كل شيء بأمر واحد
+## 1. Startup Race Conditions (Docker)
 
-```bash
-docker-compose up --build
-```
+### Problem
+`depends_on` does NOT guarantee service readiness.
 
-هذا يشغّل بالترتيب:
-1. Zookeeper
-2. Kafka (ينتظر Zookeeper)
-3. Elasticsearch (بالتوازي)
-4. Kibana (ينتظر Elasticsearch)
-5. Spark/Scala stream (ينتظر Kafka + Elasticsearch)
-6. Python Producer (ينتظر Kafka)
+- Kafka may be “started” but not accepting connections
+- Elasticsearch may be running but not ready for indexing
+- Spark / Producer may crash on first boot
 
-## الروابط بعد التشغيل
+### Fix
+Add retry + health-wait logic inside Spark and Producer:
 
-| الخدمة        | الرابط                    |
-|---------------|--------------------------|
-| Kibana        | http://localhost:5601     |
-| Elasticsearch | http://localhost:9200     |
-| Kafka         | localhost:9092            |
+- Retry Kafka connection until bootstrap is reachable
+- Retry Elasticsearch `_cluster/health` until status = yellow/green
+- Add exponential backoff (recommended: 5–30 seconds)
 
-## تشغيل بدون Docker (local)
+---
 
-### 1. Kafka
-```bash
-# تشغيل Zookeeper
-bin/zookeeper-server-start.sh config/zookeeper.properties
+## 2. Kafka Readiness Issue
 
-# تشغيل Kafka
-bin/kafka-server-start.sh config/server.properties
-```
+### Problem
+Docker healthcheck ≠ real broker readiness
 
-### 2. Elasticsearch + Kibana
-```bash
-./bin/elasticsearch
-./bin/kibana
-```
-
-### 3. Spark (Scala)
-```bash
-sbt runMain MainForStreamData
-```
-
-### 4. Python Producer
-```bash
-pip install kafka-python
-python producer.py
-```
-
-## هيكل المشروع
-
-```
-src/main/scala/
-├── AppConfig.scala                        ← كل الإعدادات
-├── MainForStreamData.scala                ← نقطة البداية الوحيدة
-├── analytics/MonthlyAnalyticsJob.scala
-├── ingestion/LinkedInIngestion.scala
-├── processing/
-│   ├── Best_Kperson_company.scala
-│   ├── Best_Kperson_skills.scala
-│   ├── countMinSkitch.scala
-│   └── localitySensitiveHashing.scala
-└── storage/
-    ├── ElasticsearchWriter.scala
-    └── ElasticsearchProcessDataWriter.scala
-
-src/main/resources/
-└── application.conf                       ← إعدادات البيئة
-
-queries/                                   ← Python للاستعلامات
-producer.py                                ← يرسل البيانات لـ Kafka
-docker-compose.yml                         ← تشغيل كل شيء
-```
+### Fix Options
+- Add explicit “wait-for-kafka” script
+- OR wrap producer initialization with retry loop:
