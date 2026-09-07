@@ -67,7 +67,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DATA_PATH: /app/data.json
     volumes:
-      - ./src/main/resources/people_1000_development.json:/app/data.json:ro
+      # `z` relabels the bind mount for SELinux while preserving read-only access.
+      - ./src/main/resources/people_1000_development.json:/app/data.json:ro,z
 
   # ─── Spark (Scala) ────────────────────────────────────────────
   spark:
