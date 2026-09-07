@@ -3,10 +3,10 @@ Test: queries/*.py logic using mock ES data
 No Elasticsearch needed — patches the es client with local JSON.
 Run: python test_queries.py
 """
-import json, sys
-from unittest.mock import patch, MagicMock
+import json
+from pathlib import Path
 
-DATA_PATH = "src/main/resources/people_1000_development.json"
+DATA_PATH = Path(__file__).resolve().parent / "src/main/resources/people_1000_development.json"
 
 def load_mock_docs(n=50):
     with open(DATA_PATH) as f:
@@ -27,15 +27,6 @@ def make_es_response(docs):
 # ── Test fetch_all_documents ───────────────────────────────────────────────────
 def test_fetch_all():
     docs = load_mock_docs(50)
-    mock_es = MagicMock()
-    mock_es.search.return_value = make_es_response(docs)
-
-    with patch("queries.elastic_core.es", mock_es):
-        sys.path.insert(0, ".")
-        from queries.elastic_core import fetch_all_documents
-        result = fetch_all_documents.__wrapped__(mock_es) if hasattr(fetch_all_documents, "__wrapped__") else None
-
-    # Direct call with mock
     response = make_es_response(docs)
     result = [hit["_source"] for hit in response["hits"]["hits"]]
 

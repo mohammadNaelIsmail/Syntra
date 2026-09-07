@@ -4,8 +4,9 @@ No Kafka needed — tests the data prep logic only.
 Run: python test_producer.py
 """
 import json, os, sys
+from pathlib import Path
 
-DATA_PATH = "src/main/resources/people_1000_development.json"
+DATA_PATH = Path(__file__).resolve().parent / "src/main/resources/people_1000_development.json"
 
 def test_file_loads():
     with open(DATA_PATH) as f:

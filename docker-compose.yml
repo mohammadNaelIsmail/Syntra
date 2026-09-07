@@ -65,6 +65,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATA_PATH: /app/data.json
     volumes:
       - ./src/main/resources/people_1000_development.json:/app/data.json:ro
 

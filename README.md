@@ -1,94 +1,78 @@
-# Syntra — Production-Ready Fixes (Critical Architecture Gaps)
+# Syntra
 
-## 1. Startup Race Conditions (Docker)
-Problem: `depends_on` does NOT guarantee readiness of services.
+Syntra is a local streaming analytics prototype for LinkedIn-style profile snapshots. A Python producer publishes JSON records to Kafka; Spark Structured Streaming parses each micro-batch, updates profile and monthly-analytics documents in Elasticsearch, and computes similarity and ranking outputs. A FastAPI query layer and a React dashboard expose the data.
 
-- Kafka may be running but not accepting connections
-- Elasticsearch may be up but not ready for indexing
-- Spark / Producer may fail on first startup due to race conditions
+## Architecture
 
-Fix:
-- Add retry + exponential backoff for Kafka connection
-- Wait for Elasticsearch `_cluster/health` = yellow/green before Spark starts
-- Add startup retry loops in Spark and Producer
+`JSON fixture → Python producer → Kafka → Spark/Scala → Elasticsearch → FastAPI → React`
 
----
+Spark uses exact `groupBy(...).count()` aggregation for skill and employer frequencies, top-K ranking, and MLlib `MinHashLSH` for approximate Jaccard similarity. Despite historical class names in the source, no Count-Min Sketch is implemented.
 
-## 2. Kafka Readiness Issue
-Problem: Docker healthcheck ≠ real broker readiness
+## Implemented API
 
-Fix:
-- Implement “wait-for-kafka” logic before producer and Spark start
-- Retry until bootstrap server responds successfully
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/profiles` | Return profile documents |
+| GET | `/profiles/search` | Filter profiles by company, skill, or date |
+| GET | `/profiles/detailed-search` | Flatten matching experience records |
+| GET | `/profiles/work-duration` | Longest recorded job per profile |
+| GET | `/analytics/monthly` | Query monthly analytics |
+| GET | `/analytics/yearly` | Query a yearly index (currently not produced) |
+| GET | `/mock/*` | Fixture-backed endpoints for the dashboard |
 
----
+## Technology
 
-## 3. Elasticsearch Readiness Issue
-Problem: ES container is up before cluster/index is usable
+Scala 2.13.14, Spark 3.5.0, Kafka/Zookeeper 7.6.0, Elasticsearch/Kibana 8.13.0, Python, FastAPI, pandas, React 19, Vite and Recharts. Docker Compose defines the infrastructure, producer and Spark services; it does not include the API or frontend.
 
-Fix:
-- Poll `/_cluster/health`
-- Block pipeline until status is `yellow` or `green`
+## Run
 
----
+Prerequisites: Docker Compose, Java 17, sbt, Python 3.11+, and Node.js.
 
-## 4. Local vs Docker Configuration Mismatch
-Problem:
-- Docker uses `kafka:29092`
-- Local uses `localhost:9092`
+```bash
+docker compose up --build
 
-Fix:
-- Use environment variable abstraction:
-  `KAFKA_BOOTSTRAP_SERVERS`
-  `ES_NODES`
+python -m venv .venv
+source .venv/bin/activate
+pip install -r queries/requirements.txt
+uvicorn queries.api:app --reload --port 8000
 
-This ensures identical runtime behavior across environments.
+cd frontend
+npm install
+npm run dev
+```
 
----
+For local pipeline development, start Kafka and Elasticsearch with Compose, then run `python producer.py` and `sbt "runMain MainForStreamData"` from the repository root.
 
-## 5. Spark Streaming Assumptions
-Problem:
-Spark assumes Kafka + ES are instantly available.
+## Verification
 
-Fix:
-- Add pre-flight checks in `MainForStreamData`
-- Validate Kafka topic existence before streaming starts
-- Retry metadata access before failing
+```bash
+python test_producer.py
+python test_queries.py
+sbt compile
+sbt "runMain TestIngestion"
+sbt "runMain TestTopK"
+sbt "runMain TestLSH"
+sbt "runMain TestElasticsearchWriter"
+sbt "runMain TestAnalyticsPipeline"
+```
 
----
+These are executable verification programs, not a conventional unit-test suite. See `HOW_TO_TEST.md` for details.
 
-## 6. System Reliability Gap
-Problem:
-Pipeline assumes perfect startup order.
+## Structure
 
-Reality:
-Distributed systems are:
-- delayed
-- partially available
-- eventually consistent
+- `producer.py` — fixture-to-Kafka producer
+- `src/main/scala/ingestion` — schema and parsing
+- `src/main/scala/processing` — counts, top-K and similarity
+- `src/main/scala/analytics` — monthly aggregation
+- `src/main/scala/storage` — Elasticsearch writers
+- `queries` — FastAPI query service
+- `frontend` — React dashboard
 
-Fix:
-- Introduce retry policies everywhere (Kafka, ES, Spark)
-- Add unified bootstrap/wait layer before starting services
+## Known limitations
 
----
-
-## 7. Production Gap Summary
-Current state:
-- Good for local development
-- Good for demos
-- Not production-safe yet
-
-Missing layer:
-- orchestration + resilience control system
-
----
-
-## Final Recommendation
-Add a bootstrap controller that:
-- waits for Kafka readiness
-- waits for Elasticsearch readiness
-- then starts Spark streaming job
-- then starts producer
-
-This removes race conditions and makes the system deterministic and production-aligned.
+- This is a local demonstration, not a production-ready service: there is no authentication, authorization, TLS, monitoring, dead-letter handling, CI, or deployment configuration.
+- The dashboard currently calls mock routes, so it does not prove the full Kafka-to-Elasticsearch path.
+- `/analytics/yearly` reads `people_yearly_stats`, but no committed job writes that index.
+- Profile experiences are queried as ordinary objects; no explicit Elasticsearch nested mapping is created.
+- Processing is micro-batch based and uses `collect()` in several paths, which limits scale.
+- Kafka and Elasticsearch run without security for local use.

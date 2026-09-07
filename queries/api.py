@@ -3,7 +3,12 @@ from typing import Optional
 import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from elastic_core import fetch_all_documents, fetch_filtered_documents
+try:
+    from .elastic_core import fetch_all_documents, fetch_filtered_documents
+    from .mock_data import MONTHLY, PROFILES, DURATION
+except ImportError:  # Support: uvicorn api:app from inside queries/
+    from elastic_core import fetch_all_documents, fetch_filtered_documents
+    from mock_data import MONTHLY, PROFILES, DURATION
 from elasticsearch import Elasticsearch
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -123,8 +128,6 @@ def detailed_search(
     return rows
 
 # ── Mock endpoints (no Elasticsearch needed) ────────────────────────────────
-from mock_data import MONTHLY, PROFILES, DURATION
-
 @app.get("/mock/analytics/monthly")
 def mock_monthly(): return [MONTHLY]
 
